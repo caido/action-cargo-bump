@@ -66,6 +66,13 @@ fn build_cli_parser<'a, 'b>() -> App<'a, 'b> {
                 .long("git-tag")
                 .help("Optional commit the updated version and create a git tag."),
         )
+        .arg(
+            Arg::with_name("package")
+                .short("k")
+                .long("package")
+                .value_name("PACKAGE")
+                .help("Optional package name"),
+        )
 }
 
 pub struct Config {
@@ -81,25 +88,36 @@ impl Config {
         let build_metadata = matches.value_of("build-metadata").map(parse_identifiers);
         let pre_release = matches.value_of("pre-release").map(parse_identifiers);
         let git_tag = matches.is_present("git-tag");
+        let target_package = matches.value_of("package").unwrap_or(".");
+
         let mut metadata_cmd = MetadataCommand::new();
         if let Some(path) = matches.value_of("manifest-path") {
             metadata_cmd.manifest_path(path);
         }
+
         let metadata = metadata_cmd.exec().expect("get cargo metadata");
-        if metadata.workspace_members.len() == 1 {
-            Config {
-                version_modifier: VersionModifier {
-                    mod_type,
-                    build_metadata,
-                    pre_release,
-                },
-                manifest: metadata[&metadata.workspace_members[0]]
-                    .manifest_path
-                    .clone(),
-                git_tag,
-            }
-        } else {
-            panic!("Workspaces are not supported yet.");
+        let package = metadata
+            .packages
+            .iter()
+            .find(|package| package.name == target_package)
+            .expect("package does not exist");
+
+        // Assert that package is a workspace member
+        metadata
+            .workspace_members
+            .iter()
+            .find(|member_id| package.id.eq(member_id))
+            .expect("package is not a workspace member");
+
+        println!("{:?}", metadata.workspace_members[0]);
+        Config {
+            version_modifier: VersionModifier {
+                mod_type,
+                build_metadata,
+                pre_release,
+            },
+            manifest: package.manifest_path.clone().into_std_path_buf(),
+            git_tag,
         }
     }
 }
