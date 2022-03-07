@@ -109,7 +109,6 @@ impl Config {
             .find(|member_id| package.id.eq(member_id))
             .expect("package is not a workspace member");
 
-        println!("{:?}", metadata.workspace_members[0]);
         Config {
             version_modifier: VersionModifier {
                 mod_type,
